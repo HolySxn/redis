@@ -14,7 +14,6 @@ var (
 
 type Server struct {
 	listenAddr string
-	ln         net.PacketConn
 	quitch     chan struct{}
 }
 
@@ -26,16 +25,37 @@ func NewServer(listenAddr string) *Server {
 }
 
 func (s *Server) StartServer() error {
-	ln, err := net.ListenPacket("udp", s.listenAddr)
+	addr, err := net.ResolveUDPAddr("udp", s.listenAddr)
 	if err != nil {
-		return err
+		return fmt.Errorf("error resolving address: %w", err)
 	}
-	defer ln.Close()
-	s.ln = ln
+
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		return fmt.Errorf("error listening on UDP: %w", err)
+	}
+	defer conn.Close()
+
+	fmt.Println("connection: ", conn.LocalAddr().String())
+
+	go s.readLoop(conn)
 
 	<-s.quitch
 
 	return nil
+}
+
+func (s *Server) readLoop(conn *net.UDPConn) {
+	buf := make([]byte, 2048)
+	for {
+		n, _, err := conn.ReadFrom(buf)
+		if err != nil {
+			fmt.Println("read error:", err)
+			continue
+		}
+
+		fmt.Print(string(buf[:n]))
+	}
 }
 
 func main() {

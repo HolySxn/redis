@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
+	"time"
 )
 
 var (
@@ -12,20 +14,29 @@ var (
 	help = flag.Bool("help", false, "Show help screen")
 )
 
-type Server struct {
-	listenAddr string
-	quitch     chan struct{}
+const maxMessageSize = 1024
+
+type Storage struct {
+	data map[string]string
+	px   map[string]time.Time
+	mu   sync.RWMutex
 }
 
-func NewServer(listenAddr string) *Server {
-	return &Server{
-		listenAddr: listenAddr,
-		quitch:     make(chan struct{}),
+// type Message struct{
+// 	msg []byte
+// 	conn *net.UDPConn
+// 	remoteAddr
+// }
+
+func NewStorage() *Storage {
+	return &Storage{
+		data: make(map[string]string),
+		px:   make(map[string]time.Time),
 	}
 }
 
-func (s *Server) StartServer() error {
-	addr, err := net.ResolveUDPAddr("udp", s.listenAddr)
+func StartServer(listenAddr string, storage *Storage) error {
+	addr, err := net.ResolveUDPAddr("udp", listenAddr)
 	if err != nil {
 		return fmt.Errorf("error resolving address: %w", err)
 	}
@@ -38,23 +49,27 @@ func (s *Server) StartServer() error {
 
 	fmt.Println("connection: ", conn.LocalAddr().String())
 
-	go s.readLoop(conn)
-
-	<-s.quitch
+	readLoop(conn, storage)
 
 	return nil
+
 }
 
-func (s *Server) readLoop(conn *net.UDPConn) {
-	buf := make([]byte, 2048)
+func readLoop(conn *net.UDPConn, store *Storage) {
+	buf := make([]byte, maxMessageSize)
 	for {
-		n, _, err := conn.ReadFrom(buf)
+		n, remoteAddr, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			fmt.Println("read error:", err)
 			continue
 		}
 
-		fmt.Print(string(buf[:n]))
+		if n == maxMessageSize && buf[maxMessageSize-1] != '\n' {
+			conn.WriteToUDP([]byte("(error) message too large(>1024 bytes)"), remoteAddr)
+			continue
+		}
+
+		go Handle(buf[:n], conn, remoteAddr, store)
 	}
 }
 
@@ -64,7 +79,11 @@ func main() {
 		log.Fatal("Invalid port", *port)
 	}
 
-	server := NewServer(fmt.Sprintf(":%d", *port))
-	server.StartServer()
+	store := NewStorage()
+
+	err := StartServer(fmt.Sprintf(":%d", *port), store)
+	if err != nil {
+		log.Fatal("error to start server: ", err)
+	}
 
 }

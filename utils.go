@@ -14,5 +14,6 @@ func isValidPort(port int) bool {
 
 func PrepareInput(input []byte) []string {
 	s := strings.TrimSuffix(string(input), "\n")
+
 	return strings.Split(s, " ")
 }

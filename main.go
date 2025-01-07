@@ -22,11 +22,6 @@ type Storage struct {
 	mu   sync.RWMutex
 }
 
-// type Message struct{
-// 	msg []byte
-// 	conn *net.UDPConn
-// 	remoteAddr
-// }
 
 func NewStorage() *Storage {
 	return &Storage{

@@ -22,7 +22,6 @@ type Storage struct {
 	mu   sync.RWMutex
 }
 
-
 func NewStorage() *Storage {
 	return &Storage{
 		data: make(map[string]string),
@@ -70,6 +69,11 @@ func readLoop(conn *net.UDPConn, store *Storage) {
 
 func main() {
 	flag.Parse()
+	if *help {
+		hlp()
+		return
+	}
+
 	if !isValidPort(*port) {
 		log.Fatal("Invalid port", *port)
 	}
@@ -81,4 +85,25 @@ func main() {
 		log.Fatal("error to start server: ", err)
 	}
 
+}
+
+func hlp() {
+	msg := `Own Redis
+
+Usage:
+  own-redis [--port <N>]
+  own-redis --help
+
+Options:
+  --help       Show this screen.
+  --port N     Port number.
+
+Commands:
+  PING                Check if the server is running.
+  SET [key] [value]   Store a value with a key.
+  SET [key] [value] px [ms]
+                      Store a value with a key and expiration in milliseconds.
+  GET [key]           Retrieve the value by key.
+`
+	fmt.Println(msg)
 }
